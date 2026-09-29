@@ -12,20 +12,25 @@ POST /api/analyze 로 감싼 FastAPI 서버.
 rear_*는 있어도 무시한다(하드웨어 없음). 앱의 AnalyzeResult.fromJson은 "rear"
 필드가 null이 아니어야 해서(레거시), front와 동일한 값을 그대로 채워 보낸다.
 """
-import itertools
 import logging
-from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from pydantic import BaseModel
+from sqlmodel import Session, select
 
 from algo_server import process_and_score
+from db import AlgoSession, AlgoStep, get_session, init_db
 
 log = logging.getLogger("SERVER")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 app = FastAPI(title="PawDynamics algo server")
+
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 Matrix = List[List[float]]
 
@@ -71,11 +76,7 @@ def analyze(req: AnalyzeRequest):
     }
 
 
-# ── 세션/걸음 기록 — 메모리에만 저장 (재시작하면 날아감, 지금은 이거로 충분) ──
-_sessions: dict[int, dict] = {}
-_session_id_seq = itertools.count(1)
-
-
+# ── 세션/걸음 기록 — Neon(Postgres) DB에 진짜로 영구 저장 (db.py 참고) ──
 class StepIn(BaseModel):
     ensemble_score: float
     left_matrix: Optional[Matrix] = None
@@ -83,30 +84,37 @@ class StepIn(BaseModel):
 
 
 @app.post("/api/sessions")
-def create_session():
-    sid = next(_session_id_seq)
-    _sessions[sid] = {
-        "id": sid,
-        "dog_name": "코코",
-        "started_at": datetime.now(timezone.utc).isoformat(),
-        "step_count": 0,
-        "latest_symmetry": None,
-    }
-    return {"id": sid}
+def create_session(db: Session = Depends(get_session)):
+    s = AlgoSession()
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return {"id": s.id}
 
 
 @app.post("/api/sessions/{session_id}/steps")
-def add_step(session_id: int, step: StepIn):
-    s = _sessions.get(session_id)
-    if s is not None:
-        s["step_count"] += 1
-        s["latest_symmetry"] = round(step.ensemble_score)
+def add_step(session_id: int, step: StepIn, db: Session = Depends(get_session)):
+    db.add(AlgoStep(session_id=session_id, ensemble_score=step.ensemble_score))
+    db.commit()
     return {"ok": True}
 
 
 @app.get("/api/sessions")
-def list_sessions():
-    return list(_sessions.values())[::-1]
+def list_sessions(db: Session = Depends(get_session)):
+    sessions = db.exec(select(AlgoSession).order_by(AlgoSession.started_at.desc())).all()
+    result = []
+    for s in sessions:
+        steps = db.exec(
+            select(AlgoStep).where(AlgoStep.session_id == s.id).order_by(AlgoStep.ts)
+        ).all()
+        result.append({
+            "id": s.id,
+            "dog_name": s.dog_name,
+            "started_at": s.started_at.isoformat(),
+            "step_count": len(steps),
+            "latest_symmetry": round(steps[-1].ensemble_score) if steps else None,
+        })
+    return result
 
 
 if __name__ == "__main__":

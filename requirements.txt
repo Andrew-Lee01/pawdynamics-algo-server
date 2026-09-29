@@ -8,3 +8,5 @@ hmmlearn==0.3.3
 joblib==1.6.0
 bleak==3.0.2
 websockets==17.1
+sqlmodel==0.0.22
+psycopg2-binary==2.9.10
