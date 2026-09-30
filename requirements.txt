@@ -10,3 +10,8 @@ bleak==3.0.2
 websockets==17.1
 sqlmodel==0.0.22
 psycopg2-binary==2.9.10
+# sqlmodel 0.0.22가 최신 pydantic과 안 맞아서
+# "Field 'id' requires a type annotation" 에러로 배포가 계속 실패했음 —
+# 로컬에서 검증된(FastAPI 0.141.1과 호환 확인된) 버전으로 고정.
+pydantic==2.13.5
+pydantic-core==2.46.5
