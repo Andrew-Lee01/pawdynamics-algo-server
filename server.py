@@ -99,6 +99,17 @@ def add_step(session_id: int, step: StepIn, db: Session = Depends(get_session)):
     return {"ok": True}
 
 
+@app.delete("/api/sessions")
+def clear_sessions(db: Session = Depends(get_session)):
+    """저장된 세션/걸음 기록을 전부 지운다 — 테스트 데이터 정리용."""
+    for step in db.exec(select(AlgoStep)).all():
+        db.delete(step)
+    for s in db.exec(select(AlgoSession)).all():
+        db.delete(s)
+    db.commit()
+    return {"ok": True}
+
+
 @app.get("/api/sessions")
 def list_sessions(db: Session = Depends(get_session)):
     sessions = db.exec(select(AlgoSession).order_by(AlgoSession.started_at.desc())).all()
