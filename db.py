@@ -23,7 +23,11 @@ else:
     DATABASE_URL = "sqlite:///./algo_sessions.db"
     connect_args = {"check_same_thread": False}
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+# pool_pre_ping: 쿼리 실행 전에 연결이 살아있는지 가볍게 확인(SELECT 1)하고,
+# Neon이 오래 쉬던 연결을 끊어버렸으면 자동으로 새 연결로 교체한다 — 이게 없으면
+# 한참 쉬었다가 들어온 첫 요청이 "죽은 연결"을 그대로 쓰다가 500으로 실패하고,
+# 그다음 재시도에서만 성공하는 패턴이 반복됐다.
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 
 
 def _utcnow() -> datetime:
