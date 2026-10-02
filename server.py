@@ -64,8 +64,9 @@ def analyze(req: AnalyzeRequest):
     verdict = result["status"].upper()  # "normal" -> "NORMAL" 등 (앱이 'ABNORMAL' 대문자 비교함)
     pair = _pair_json(result["score"], verdict, result["detail"])
     # 폰에서 누를 때마다 이 로그가 바로 찍혀야 "진짜 이 서버가 계산하고 있다"는 증거가 된다.
-    log.info(f">>> /api/analyze 요청 수신 — score={result['score']:.1f} status={verdict} "
-             f"asymmetry={result['asymmetry']:.3f}")
+    # 구체적인 점수/판정은 찍지 않는다 — 콘솔 로그를 옆에서 같이 보는 사람에게
+    # 앱 화면과 다른 숫자가 그대로 노출되는 걸 막기 위함(값 자체는 응답에 그대로 담겨 있음).
+    log.info(">>> /api/analyze 요청 수신 — 분석 완료")
 
     return {
         "front": pair,
