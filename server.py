@@ -19,7 +19,7 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from algo_server import process_and_score
+from algo_server import process_and_score, reset_algo_state
 from db import AlgoSession, AlgoStep, get_session, init_db
 
 log = logging.getLogger("SERVER")
@@ -85,6 +85,9 @@ class StepIn(BaseModel):
 
 @app.post("/api/sessions")
 def create_session(db: Session = Depends(get_session)):
+    # 새 측정 세션 시작 — 이전 세션에서 "연속 비정상 확정"된 알고리즘 상태가
+    # 새 세션까지 넘어오지 않도록 매번 초기화한다.
+    reset_algo_state()
     s = AlgoSession()
     db.add(s)
     db.commit()

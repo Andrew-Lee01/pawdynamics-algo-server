@@ -83,6 +83,29 @@ _last_formatted: Dict = {
     "detail": {"note": "첫 보행 주기(입각→유각) 완성 전 — 기본값"},
 }
 
+
+def reset_algo_state() -> None:
+    """새 측정 세션이 시작될 때 호출한다.
+
+    EnsembleV2는 "연속 2회 비정상이면 그 뒤로는 영원히 ABNORMAL로 확정"하는
+    forced_ab 안전장치를 갖고 있는데, 이 상태가 전역(프로세스 전체 공유)이라
+    한 번 걸리면 리셋되지 않고 이후의 모든 측정 세션에 그대로 들러붙는 문제가
+    있었다 — 이전 세션에서 비대칭 데이터로 한 번 ABNORMAL이 확정되면, 전혀
+    다른(정상적인) 새 세션을 시작해도 서버가 계속 비정상이라고 판정했다.
+    세션 단위로 전부 새로 만들어서 이전 세션의 흔적이 넘어오지 않게 한다.
+    """
+    global preprocessor, cop_analyzer, ensemble, _cop_buffer, _last_formatted
+    preprocessor = GaitPreprocessorV2(ROBOT_WEIGHT_KG)
+    cop_analyzer = CopAnalyzer()
+    ensemble = EnsembleV2()
+    _cop_buffer = []
+    _last_formatted = {
+        "score": 50.0,
+        "status": "normal",
+        "asymmetry": 0.5,
+        "detail": {"note": "첫 보행 주기(입각→유각) 완성 전 — 기본값"},
+    }
+
 # final(0~1, 높을수록 비정상)에 따른 3단계 상태 구분 임계값.
 # final>0.5 는 predict() 안에서 이미 ABNORMAL 로 확정되므로, 그 아래(0.3~0.5)는
 # "정상이긴 하지만 앙상블 점수가 애매하게 높다"는 경계 구간으로 warning 처리.
