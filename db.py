@@ -27,7 +27,21 @@ else:
 # Neon이 오래 쉬던 연결을 끊어버렸으면 자동으로 새 연결로 교체한다 — 이게 없으면
 # 한참 쉬었다가 들어온 첫 요청이 "죽은 연결"을 그대로 쓰다가 500으로 실패하고,
 # 그다음 재시도에서만 성공하는 패턴이 반복됐다.
-engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+#
+# pool_size/max_overflow를 작게 제한하는 이유: 기본값(5+10=최대 15개)까지 늘어나면
+# Neon 무료 플랜의 동시 연결 제한을 넘어서서 일부 요청이 응답 없이 멈추는
+# 문제가 있었다 — 작게 제한해서 Neon 쪽 한도 안에서만 쓰게 한다.
+# pool_timeout: 풀이 꽉 찼을 때 무한정 기다리지 않고 5초 안에 실패시켜서,
+# 클라이언트가 수십 초씩 응답 없이 멈추는 대신 빠르게 에러를 받게 한다.
+engine = create_engine(
+    DATABASE_URL,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    pool_size=3,
+    max_overflow=2,
+    pool_timeout=5,
+    pool_recycle=280,
+)
 
 
 def _utcnow() -> datetime:
